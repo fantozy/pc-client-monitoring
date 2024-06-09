@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Usage: ./scripts/build
+
+docker build --file Dockerfile.server --tag real-monitoring:cloud .

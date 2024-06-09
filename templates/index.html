@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Monitoring</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.0.0"></script>
+
+    <style>
+        .flex {
+            display: flex;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <h1>Server Monitoring</h1>
+    <div id="pc-list">
+        <!-- Dynamic content will be appended here -->
+    </div>
+
+    <script>
+        const socket = io('{{ server_url }}');
+        let dataArr = [];
+        let charts = {};
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('tunnel-data', (data) => {
+
+            function macExists(addr) {
+                return dataArr.some(function (el) {
+                    return el.mac_address === addr;
+                });
+            }
+
+            if (data.status === 'offline') {
+                const infoDiv = document.getElementById(`info-${data.mac_address}`);
+                const chartDiv = document.getElementById(`info-${data.mac_address}-charter`);
+
+                if (infoDiv) {
+                    infoDiv.remove();
+                }
+
+                if (chartDiv) {
+                    chartDiv.remove();
+                }
+
+                // Remove the data and chart from arrays
+                dataArr = dataArr.filter(item => item.mac_address !== data.mac_address);
+                if (charts[data.mac_address]) {
+                    charts[data.mac_address].destroy();
+                    delete charts[data.mac_address];
+                }
+                console.log(`Removed data for ${data.mac_address}`);
+                return; // Exit early since the client is offline
+            }
+
+            if (macExists(data.mac_address)) {
+                // Update existing object
+                dataArr = dataArr.map((item) => {
+                    if (item.mac_address === data.mac_address) {
+                        // Update CPU, memory, and time arrays
+                        item.prev_cpu.push(data.cpu);
+                        item.prev_memory.push(data.memory);
+                        item.prev_time.push(data.time);
+
+                        // Limit the data arrays to the last 100 entries
+                        if (item.prev_cpu.length > 100) item.prev_cpu.shift();
+                        if (item.prev_memory.length > 100) item.prev_memory.shift();
+                        if (item.prev_time.length > 100) item.prev_time.shift();
+
+                        // Update the text data
+                        updateTextData(item);
+
+                        // Update the chart
+                        if (charts[item.mac_address]) {
+                            updateChart(charts[item.mac_address], item);
+                        }
+
+                        return item;
+                    }
+
+                    return item;
+                });
+            } else {
+                // Add new object
+                data.prev_cpu = [data.cpu];
+                data.prev_memory = [data.memory];
+                data.prev_time = [data.time];
+                dataArr.push(data);
+
+                // Add the new object to the DOM
+                const pcList = document.getElementById('pc-list');
+                const newDiv = document.createElement('div');
+                newDiv.className = 'flex';
+                newDiv.id = `pc-${data.mac_address}`;
+                newDiv.innerHTML = `
+                    <div id="info-${data.mac_address}">
+                        <h2>PC: ${data.pc_name}</h2>
+                        <p>MAC Address: ${data.mac_address}</p>
+                        <p>Memory Usage: <span class="memory">${data.memory}</span>%</p>
+                        <p>CPU Usage: <span class="cpu">${data.cpu}</span>%</p>
+                    </div>
+                    <div id="info-${data.mac_address}-charter">
+                        <canvas id="${data.mac_address}"></canvas>
+                    </div>
+                `;
+                pcList.appendChild(newDiv);
+
+                // Delay the chart creation to ensure the canvas element is in the DOM
+                setTimeout(() => addChart(data), 100);
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+
+        function updateTextData(data) {
+            const infoDiv = document.getElementById(`info-${data.mac_address}`);
+            if (infoDiv) {
+                infoDiv.querySelector('.memory').textContent = data.prev_memory[data.prev_memory.length - 1];
+                infoDiv.querySelector('.cpu').textContent = data.prev_cpu[data.prev_cpu.length - 1];
+            }
+        }
+
+        function addChart(data) {
+            const ctx = document.getElementById(data.mac_address).getContext('2d');
+            const chart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: data.prev_time,
+                    datasets: [
+                        {
+                            label: "CPU Usage",
+                            data: data.prev_cpu,
+                            fill: false,
+                            borderColor: "rgb(75, 192, 192)",
+                            tension: 0.1
+                        },
+                        {
+                            label: "Memory Usage",
+                            data: data.prev_memory,
+                            fill: false,
+                            borderColor: "rgb(192, 75, 75)",
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: "x"
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                    mode: "x"
+                                },
+                                drag: {
+                                    enabled: true,
+                                    mode: "x"
+                                },
+                                pinch: {
+                                    enabled: true,
+                                    mode: "x"
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            charts[data.mac_address] = chart;
+        }
+
+        function updateChart(chart, data) {
+            chart.data.labels = data.prev_time;
+            chart.data.datasets[0].data = data.prev_cpu;
+            chart.data.datasets[1].data = data.prev_memory;
+            chart.update();
+        }
+    </script>
+</body>
+
+</html>

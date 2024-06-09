@@ -1,0 +1,16 @@
+version: '3.3'
+
+services:
+  web:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: client-data-monitoring
+    restart: always
+    environment:
+      - USER=${USER}
+      - UID=${UID}
+      - GID=${GID}
+    volumes:
+      - .:/app/
+    command: bash -c "python3 client.py"

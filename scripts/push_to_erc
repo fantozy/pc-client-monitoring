@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Usage: ./scripts/push_to_ecr
+
+# First build (./scripts/build), then push to ecr.
+
+aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 590183860676.dkr.ecr.eu-central-1.amazonaws.com
+
+
+docker tag real-monitoring:cloud 590183860676.dkr.ecr.eu-central-1.amazonaws.com/real_monitor:latest
+
+docker push 590183860676.dkr.ecr.eu-central-1.amazonaws.com/real_monitor:latest

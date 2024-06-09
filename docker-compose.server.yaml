@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  server:
+    container_name: 'monitoring_server'
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+
+    entrypoint: [ "python3", "server.py" ]
+
