@@ -63,5 +63,5 @@ def send_monitoring_data(server_url):
         sio.disconnect()
 
 
-server_url = "http://54.93.118.164:5000/"
+server_url = "http://3.79.179.11:5000/"
 send_monitoring_data(server_url)
